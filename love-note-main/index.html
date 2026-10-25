@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Love Counter</title>
+  <link rel="icon" type="image/x-icon" href="https://i.loli.net/2021/06/03/lFg2V4WUcmkB98G.png">
+  <meta name="language" content="Love_Counter">
+  <meta name="title" content="love-counter">
+  <link type="text/css" rel="stylesheet" href="./Love_files/default.css">
+  <style>
+    /* "Bahagia selalu" lanjutan teks, font besar, mengalir (tidak menimpa) */
+    #code .bahagia {
+      font-size: 30px;
+      font-style: italic;
+      color: #ffd1dc;
+      opacity: 0;
+      transition: opacity 1.2s ease;
+    }
+    #code .bahagia.show { opacity: 1; }
+
+    /* ===== Tampilan mobile ===== */
+    @media (max-width: 800px) {
+      html, body { width: 100%; height: 100%; overflow: hidden; }
+      #main, #wrap {
+        position: fixed !important;
+        left: 0 !important; top: 0 !important;
+        width: 100% !important; height: 100% !important;
+        margin: 0 !important; padding: 0 !important;
+      }
+      #canvas {
+        position: absolute !important;
+        left: 0 !important; top: 0 !important;
+        width: 100% !important; height: 100% !important;
+      }
+      #text {
+        position: absolute !important;
+        left: 5% !important; top: 14px !important;
+        width: 90% !important; height: auto !important;
+        margin: 0 !important; transform: none !important;
+        z-index: 5; pointer-events: none;
+        text-shadow: 0 1px 6px rgba(0, 0, 0, .35);
+      }
+      #code, #code .say {
+        font-size: 13.5px !important;
+        line-height: 1.55 !important;
+      }
+      #code .bahagia { font-size: 22px; }
+      #music-btn { z-index: 10; }
+    }
+  </style>
+  <script type="text/javascript" src="./Love_files/jquery.min.js"></script>
+  <script type="text/javascript" src="./Love_files/functions.js" charset="utf-8"></script>
+  <!-- love.js (pohon hati) tidak dipakai lagi -->
+</head>
+
+<body>
+  <div id="main">
+    <div id="error">
+      Dear, your browser does not support the content that is about to be displayed.
+      Please switch to Google (<a
+        href="http://www.google.cn/chrome/intl/zh-CN/landing_chrome.html?hl=zh-CN&brand=CHMI">Chrome</a>)
+      or Firefox (<a href="http://firefox.com.cn/download/">Firefox</a>) browser~
+    </div>
+
+    <div id="wrap">
+      <div id="text">
+        <div id="code">
+          <span class="say">Selamat ulang tahun Dhila!</span><br>
+          <span class="say">Semoga hari-harimu selalu dipenuhi kebahagiaan yaa,</span><br>
+          <span class="say">Semoga langkahmu dimudahkan dalam meraih cita-cita, dan selamat juga atas gelar barunya!! Semoga segera mendapatkan pekerjaan yang sesuai dengan bidang yang kamu tekuni.</span><br>
+          <span class="say">Semoga semua yang di impikan perlahan menjadi nyata.</span><br>
+          <span class="say">Semoga selalu diberi kesehatan, kekuatan, dan ketenangan.</span><br>
+          <span class="say">Semoga masa depanmu indah dan dipenuhi hal-hal baik. Aamin</span><br>
+          <span class="say">Wishing you all the happiness and success you deserve, Dhila! ✨</span>
+        </div>
+      </div>
+
+      <canvas id="canvas" width="1500" height="680"></canvas>
+    </div>
+    <div id="music-btn">
+      <img src="./cd.png" alt="cd" class="cd">
+      <audio preload="auto" id="media" src="kissme.mp3" loop="loop"></audio>
+    </div>
+  </div>
+
+  <script>
+    var audio = document.getElementById('media');
+    var musicBtn = document.getElementById('music-btn');
+    var cd = document.getElementsByClassName('cd')[0];
+
+    musicBtn.addEventListener('click', function () {
+      if (audio.paused) {
+        audio.play();
+        cd.classList.add("spin");
+      } else {
+        audio.pause();
+        cd.classList.remove("spin");
+      }
+    });
+
+    (function () {
+      var canvas = document.getElementById('canvas');
+      var ctx = canvas.getContext ? canvas.getContext('2d') : null;
+      if (!ctx) { $("#error").show(); return false; }
+
+      // ===== Mode mobile: kanvas = ukuran layar, pohon diskalakan =====
+      var isMobile = window.matchMedia('(max-width: 800px)').matches;
+      if (isMobile) {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+
+      var W = canvas.width, H = canvas.height;
+      var K = 1; // skala pohon (1 = ukuran desktop)
+      if (isMobile) {
+        K = clamp(Math.min(W / 460, (H * 0.45) / 500), 0.45, 1);
+      }
+
+      var PINKS = ['#ffd1dc', '#ffb7c5', '#ff9eb5', '#fff0f5', '#f8c8dc'];
+      function rand(a, b) { return a + Math.random() * (b - a); }
+      function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+      var easeOutBack = function (t) {
+        var c1 = 1.70158, c3 = c1 + 1;
+        return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+      };
+      var easeInOut = function (t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; };
+
+      // Posisi: desktop = tumbuh di tengah lalu bergeser ke kanan; mobile = tetap di tengah bawah
+      var baseX = isMobile ? W / 2 : W / 2 - 20;
+      var baseY = H - 20;
+      var finalShift = isMobile ? 0 : 270;
+      var moveDur = isMobile ? 400 : 1800;
+      var offX = 0;
+
+      var branches = [], blossoms = [], petals = [];
+      var growEnd = 0, startTime = 0, moveStart = 0;
+      var phase = 'idle'; // idle -> shrink (balon terbang) -> grow -> move -> done
+
+      // ===== Kanvas cadangan untuk pohon =====
+      var treeLayer = document.createElement('canvas');
+      treeLayer.width = W; treeLayer.height = H;
+      var lctx = treeLayer.getContext('2d');
+
+      // ===== Sprite bunga & kelopak =====
+      function makeBlossomSprite(color) {
+        var c = document.createElement('canvas');
+        c.width = c.height = 64;
+        var g = c.getContext('2d');
+        g.translate(32, 32);
+        g.fillStyle = color;
+        for (var i = 0; i < 5; i++) {
+          g.rotate((Math.PI * 2) / 5);
+          g.beginPath();
+          g.ellipse(0, -14, 9, 16, 0, 0, Math.PI * 2);
+          g.fill();
+        }
+        g.fillStyle = '#ffe28a';
+        g.beginPath();
+        g.arc(0, 0, 4, 0, Math.PI * 2);
+        g.fill();
+        return c;
+      }
+      function makePetalSprite(color) {
+        var c = document.createElement('canvas');
+        c.width = 32; c.height = 20;
+        var g = c.getContext('2d');
+        g.fillStyle = color;
+        g.beginPath();
+        g.ellipse(16, 10, 15, 9, 0, 0, Math.PI * 2);
+        g.fill();
+        return c;
+      }
+      var blossomSprites = PINKS.map(makeBlossomSprite);
+      var petalSprites = PINKS.map(makePetalSprite);
+
+      function stamp(g, img, x, y, rot, sx, sy, a) {
+        var c = Math.cos(rot), s = Math.sin(rot);
+        g.globalAlpha = a;
+        g.setTransform(c * sx, s * sx, -s * sy, c * sy, x, y);
+        g.drawImage(img, -img.width / 2, -img.height / 2);
+        g.setTransform(1, 0, 0, 1, 0, 0);
+        g.globalAlpha = 1;
+      }
+
+      // ===== Balon bertali + label "Klik di sini" =====
+      var seed = { x: baseX, y: H * 0.42, s: 20 };
+
+      function drawSeed(now) {
+        var idle = phase === 'idle';
+        var sway = Math.sin(now / 600) * (idle ? 6 : 3);
+        var bob = idle ? Math.sin(now / 500) * 4 : 0;
+        var x = seed.x + sway, y = seed.y + bob;
+        var rx = seed.s * 1.3, ry = seed.s * 1.6;
+        var knotY = y + ry + 4;
+        var strLen = seed.s * 4.5;
+
+        ctx.save();
+
+        // Tali
+        ctx.strokeStyle = 'rgba(255,255,255,.85)';
+        ctx.lineWidth = 1.5;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(x, knotY);
+        ctx.quadraticCurveTo(x - 12 - sway, knotY + strLen * 0.5, x - sway * 2.5, knotY + strLen);
+        ctx.stroke();
+
+        // Badan balon
+        var g = ctx.createRadialGradient(x - rx * 0.35, y - ry * 0.4, 2, x, y, ry * 1.1);
+        g.addColorStop(0, '#fff5f8');
+        g.addColorStop(0.5, '#ffb7c5');
+        g.addColorStop(1, '#ff7f9e');
+        ctx.shadowColor = '#ffb7c5';
+        ctx.shadowBlur = 18;
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Simpul di bawah balon
+        ctx.fillStyle = '#ff7f9e';
+        ctx.beginPath();
+        ctx.moveTo(x, knotY - 5);
+        ctx.lineTo(x - 5, knotY + 4);
+        ctx.lineTo(x + 5, knotY + 4);
+        ctx.closePath();
+        ctx.fill();
+
+        // Kilau
+        ctx.fillStyle = 'rgba(255,255,255,.6)';
+        ctx.beginPath();
+        ctx.ellipse(x - rx * 0.4, y - ry * 0.4, rx * 0.18, ry * 0.3, -0.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Label hanya sebelum balon diklik
+        if (idle) {
+          ctx.globalAlpha = 0.65 + Math.sin(now / 400) * 0.35;
+          ctx.fillStyle = '#fff';
+          ctx.font = '600 16px "Segoe UI", Arial, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.shadowColor = 'rgba(0,0,0,.3)';
+          ctx.shadowBlur = 6;
+          ctx.fillText('Klik di sini', x - sway * 2.5, knotY + strLen + 24);
+        }
+        ctx.restore();
+      }
+
+      function seedHover(e) {
+        var r = canvas.getBoundingClientRect();
+        var x = (e.clientX - r.left) * (W / r.width);
+        var y = (e.clientY - r.top) * (H / r.height);
+        return Math.abs(x - seed.x) < 60 && Math.abs(y - (seed.y + 40)) < 100;
+      }
+
+      canvas.addEventListener('mousemove', function (e) {
+        if (phase === 'idle') canvas.style.cursor = seedHover(e) ? 'pointer' : 'default';
+      });
+      canvas.addEventListener('click', function (e) {
+        if (phase !== 'idle' || !seedHover(e)) return;
+        phase = 'shrink';
+        canvas.style.cursor = 'default';
+        audio.play().catch(function () {});
+        cd.classList.add('spin');
+      });
+
+      // ===== Pohon =====
+      function quad(b, u) {
+        var a = (1 - u) * (1 - u), m = 2 * (1 - u) * u, c = u * u;
+        return { x: a * b.x + m * b.cx + c * b.x2, y: a * b.y + m * b.cy + c * b.y2 };
+      }
+
+      function makeBranch(x, y, angle, len, width, depth, t0) {
+        var x2 = x + Math.cos(angle) * len;
+        var y2 = y + Math.sin(angle) * len;
+        var bend = rand(-0.15, 0.15) * len;
+        var cx = (x + x2) / 2 + Math.cos(angle + Math.PI / 2) * bend;
+        var cy = (y + y2) / 2 + Math.sin(angle + Math.PI / 2) * bend;
+        var dur = (len / K) * 7; // durasi tumbuh sama di desktop & mobile
+        var b = { x: x, y: y, x2: x2, y2: y2, cx: cx, cy: cy, width: width, depth: depth, t0: t0, dur: dur, drawn: 0 };
+        branches.push(b);
+        growEnd = Math.max(growEnd, t0 + dur);
+
+        if (depth < 7) {
+          var nt = t0 + dur, nlen = len * rand(0.72, 0.8), nw = width * 0.7;
+          makeBranch(x2, y2, angle - rand(0.25, 0.55), nlen, nw, depth + 1, nt);
+          makeBranch(x2, y2, angle + rand(0.25, 0.55), nlen, nw, depth + 1, nt);
+          if (depth < 4 && Math.random() < 0.5) {
+            makeBranch(x2, y2, angle + rand(-0.15, 0.15), nlen * 0.9, nw, depth + 1, nt);
+          }
+        }
+      }
+
+      function buildTree() {
+        makeBranch(baseX, baseY, -Math.PI / 2, 135 * K, 13 * K, 0, 0);
+        branches.forEach(function (b) {
+          if (b.depth < 3) return;
+          var count = b.depth >= 5 ? 3 : 2;
+          for (var i = 0; i < count; i++) {
+            var p = quad(b, rand(0.4, 1));
+            blossoms.push({
+              x: p.x + rand(-6, 6) * K, y: p.y + rand(-6, 6) * K,
+              size: rand(6, 11) * K, rot: rand(0, Math.PI * 2),
+              sprite: blossomSprites[Math.floor(Math.random() * blossomSprites.length)],
+              t0: b.t0 + b.dur + rand(0, 2500),
+              done: false
+            });
+          }
+        });
+      }
+      buildTree();
+
+      function growBranch(b, t) {
+        var p = clamp((t - b.t0) / b.dur, 0, 1);
+        if (p <= b.drawn) return;
+        var from = b.drawn;
+        var steps = Math.max(1, Math.ceil((p - from) * 8));
+        lctx.strokeStyle = '#8b5e4b';
+        lctx.lineCap = 'round';
+        var prev = quad(b, from);
+        for (var i = 1; i <= steps; i++) {
+          var u = from + (p - from) * (i / steps), cur = quad(b, u);
+          lctx.lineWidth = Math.max(b.width * (1 - 0.3 * u), 1);
+          lctx.beginPath();
+          lctx.moveTo(prev.x, prev.y);
+          lctx.lineTo(cur.x, cur.y);
+          lctx.stroke();
+          prev = cur;
+        }
+        b.drawn = p;
+      }
+
+      // ===== Kelopak berguguran =====
+      function spawnPetal() {
+        if (petals.length > 160) return;
+        var bloomed = blossoms.filter(function (b) { return b.done; });
+        if (!bloomed.length) return;
+        var b = bloomed[Math.floor(Math.random() * bloomed.length)];
+        petals.push({
+          x: b.x, y: b.y,
+          vy: rand(0.5, 1.3) * K, vx: rand(-0.2, 0.6) * K,
+          size: rand(3.5, 7) * K, rot: rand(0, Math.PI * 2), vrot: rand(-0.04, 0.04),
+          phase: rand(0, Math.PI * 2), flip: rand(0, Math.PI * 2),
+          sprite: petalSprites[Math.floor(Math.random() * petalSprites.length)],
+          gy: baseY + rand(-4, 12) * K, landed: false, alpha: 1
+        });
+      }
+
+      function updatePetals(dt, t) {
+        var wind = (Math.sin(t / 2500) * 0.25 + 0.2) * K;
+        for (var i = petals.length - 1; i >= 0; i--) {
+          var p = petals[i];
+          if (!p.landed) {
+            p.phase += 0.03 * dt;
+            p.flip += 0.06 * dt;
+            p.x += (p.vx + Math.sin(p.phase) * 0.8 * K + wind) * dt;
+            p.y += p.vy * dt;
+            p.rot += p.vrot * dt;
+            if (p.y >= p.gy) p.landed = true;
+          } else {
+            p.alpha -= 0.004 * dt;
+            if (p.alpha <= 0) petals.splice(i, 1);
+          }
+        }
+      }
+
+      function drawPetals() {
+        for (var i = 0; i < petals.length; i++) {
+          var p = petals[i];
+          var sx = p.size / 15;
+          var sy = sx * (p.landed ? 0.4 : Math.abs(Math.cos(p.flip)) * 0.8 + 0.2);
+          stamp(ctx, p.sprite, p.x + offX, p.y, p.rot, sx, sy, Math.max(p.alpha, 0));
+        }
+      }
+
+      // ===== Teks =====
+      function showBahagia() {
+        var last = $("#code .say").last();
+        var el = $('<span class="bahagia">Bahagia selalu</span>');
+        last.append(' ').append(el);
+        setTimeout(function () { el.addClass('show'); }, 50);
+      }
+
+      function showText() {
+        $("#code").show().typewriter();
+        var tries = 0;
+        (function wait() {
+          tries++;
+          // Cek akhir kalimat terakhir: "... you deserve, Dhila! ✨"
+          var done = $("#code").text().indexOf("Dhila! ✨") !== -1;
+          if (done || tries > 200) {
+            setTimeout(showBahagia, 800);
+          } else {
+            setTimeout(wait, 200);
+          }
+        })();
+      }
+
+      // ===== Loop =====
+      var last = performance.now();
+      function frame(now) {
+        var dt = Math.min(50, now - last) / 16.67;
+        last = now;
+        ctx.clearRect(0, 0, W, H);
+
+        if (phase === 'idle') {
+          drawSeed(now);
+        } else if (phase === 'shrink') {
+          // balon terbang naik sampai keluar layar, lalu pohon tumbuh
+          seed.y -= 4 * dt;
+          drawSeed(now);
+          if (seed.y < -seed.s * 9) {
+            phase = 'grow';
+            startTime = now;
+          }
+        } else {
+          var t = now - startTime;
+
+          if (phase === 'grow' && t > growEnd + 1200) {
+            phase = 'move';
+            moveStart = now;
+          }
+          if (phase === 'move') {
+            var k = clamp((now - moveStart) / moveDur, 0, 1);
+            offX = easeInOut(k) * finalShift;
+            if (k >= 1) {
+              phase = 'done';
+              showText();
+            }
+          }
+
+          for (var i = 0; i < branches.length; i++) growBranch(branches[i], t);
+          for (var j = 0; j < blossoms.length; j++) {
+            var bl = blossoms[j];
+            if (bl.done) continue;
+            if (t - bl.t0 >= 900) {
+              stamp(lctx, bl.sprite, bl.x, bl.y, bl.rot, bl.size / 20, bl.size / 20, 1);
+              bl.done = true;
+            }
+          }
+
+          ctx.drawImage(treeLayer, offX, 0);
+
+          for (var m = 0; m < blossoms.length; m++) {
+            var b2 = blossoms[m];
+            if (b2.done) continue;
+            var pp = clamp((t - b2.t0) / 900, 0, 1);
+            if (pp <= 0) continue;
+            var sc = b2.size * easeOutBack(pp) / 20;
+            stamp(ctx, b2.sprite, b2.x + offX, b2.y, b2.rot, sc, sc, 1);
+          }
+
+          if (phase === 'done') {
+            if (Math.random() < 0.6 * dt) spawnPetal();
+            updatePetals(dt, t);
+          }
+          drawPetals();
+        }
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    })();
+  </script>
+
+</body>
+
+</html>
