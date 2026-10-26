@@ -9,7 +9,7 @@ Credit to 'https://guoqi.dev/'
 * **Deployment:** GitHub Pages / Netlify
 
 * ## 🌐 Live Demo
-* Check it out here: [waiyanjourney.netlify.app](https://waiyanjourney.netlify.app/)
+* Check it out here: (https://dlla27.netlify.app/)
 
 * ## 📈 Goals
 * This repository is a personal milestone.📑
